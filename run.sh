@@ -2,26 +2,36 @@
 # CONSTANTS
 filename_results="results.txt"
 filename_dsolve_log="dsolve.log"
+omega_i0=0.0232
+krange=$(seq 0.1 0.05 0.8)
+interp_degree=3 # cubic (interpolation routine requires nPts > interp_degree)
 
 # New values for wavenumber
-for kstart in $(seq 0.75 0.05 0.8)
+for kstart in $krange
 do
     kend=$kstart
 
     # Check if the `results.txt` file has non-zero size
     if [ -s "$filename_results" ]; then
-        # get latest omega_i value
-        #omega_i=$(tail -n 1 "$filename_results" | cut -f 3)
 
-        # Use an interpolation function to estimate the next omega_i
-        echo "Interpolating omega_i..."
-        omega_i=$(python3 interpolate.py "results.txt" $kstart)
+        # Count number of lines in results.txt (need at least two for interpolation)
+        n_results=$(wc -l < $filename_results)
+
+        if [ $n_results -lt $(($interp_degree+1)) ]; then
+            # get the last omega_i value
+            echo "Reading the last omega_i"
+            omega_i=$(tail -n 1 "$filename_results" | cut -f 3)
+        else
+            # Use an interpolation function to estimate the next omega_i
+            echo "Interpolating omega_i..."
+            omega_i=$(python3 interpolate.py -k $interp_degree "results.txt" $kstart)
+        fi
     else
-        omega_i=0.0306
+        omega_i=$omega_i0
     fi
 
     echo "Preparing INPUT..."
-    echo "kstart: $kstart, kend: $kend"
+    echo "kstart: $kstart, kend: $kend, omega_i: $omega_i"
 
     # Use sed to modify the values in the input.dat file
     sed -i "s/kstart =0.*/kstart =$kstart/" input.dat
@@ -46,7 +56,7 @@ do
 
     # Append the k, omega, and gamma values to `results.txt` in a single row with tab separation
     echo -e "$k\t$omega\t$gamma" >> $filename_results
-    #break
+    break
 done
 
 # End of script 
